@@ -22,6 +22,7 @@
  */
 
 #include "nir/nir_builder.h"
+#include "util/u_debug.h"
 #include "nir/nir_format_convert.h"
 
 #include "vk_buffer.h"
@@ -971,7 +972,7 @@ build_image_to_buffer_shader(const struct vk_meta_device *meta,
    if (!getenv("PANVK_COPY_PROBE_RAW_TEXEL")) {
       texel = convert_texel(b, iview_fmt, buf_fmt, texel);
    } else {
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG COPY_RAW_TEXEL: bypassing convert_texel after nir_txf\\n");
    }
 
@@ -1285,7 +1286,7 @@ copy_buffer_image_prepare_compute_push_const(
 
    if (getenv("PANVK_TRACE_WSI_COPY") &&
        key->key_type == VK_META_OBJECT_KEY_COPY_IMAGE_TO_BUFFER) {
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG COPY_PUSH cmd=%p buffer=%p DST=%016llx "
               "row_stride=%u image_stride=%u range=%u,%u,%u..%u,%u,%u "
               "wg=%u,%u,%u\n",
@@ -1421,7 +1422,7 @@ copy_image_to_buffer_region(
    };
 
    if (getenv("PANVK_TRACE_WSI_COPY"))
-      fprintf(stderr, "PANVKDBG COPY_BIND cmd=%p view=%p set=0 binding=0\n",
+      PANVKDBG_PRINT( "PANVKDBG COPY_BIND cmd=%p view=%p set=0 binding=0\n",
               (void *)vk_command_buffer_to_handle(cmd),
               (void *)(uintptr_t)iview);
 

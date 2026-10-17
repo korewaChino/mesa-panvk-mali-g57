@@ -5,6 +5,7 @@
  */
 
 #include "panvk_buffer.h"
+#include "util/u_debug.h"
 #include "panvk_cmd_meta.h"
 #include "panvk_entrypoints.h"
 #include "panvk_image.h"
@@ -491,7 +492,7 @@ panvk_per_arch(CmdCopyImageToBuffer2)(
       const VkImageSubresourceLayers *sub =
          &pCopyImageToBufferInfo->pRegions[0].imageSubresource;
       unsigned plane = panvk_plane_index(img, sub->aspectMask);
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG WSI_COPY image=%p plane=%u SRC=%016llx "
               "dst_buffer=%p DST=%016llx regions=%u extent=%ux%ux%u "
               "bufferOffset=%llu rowLength=%u imageHeight=%u\n",
@@ -517,7 +518,7 @@ panvk_per_arch(CmdCopyImageToBuffer2)(
                            r->imageExtent.height *
                            r->imageExtent.depth * 4;
 
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG USERBUF_FILL_PROBE dst=%p offset=%llu "
               "size=%llu pattern=a5a5a5a5\n",
               (void *)(uintptr_t)pCopyImageToBufferInfo->dstBuffer,
@@ -573,7 +574,7 @@ panvk_per_arch(CmdCopyImageToBuffer2)(
             .regionCount = 1, .pRegions = &region,
          };
          if (unlikely(getenv("PANVK_VERBOSE")))
-            fprintf(stderr, "PANVKDBG COPY_RAW SRC=%016llx DST=%016llx bytes=%llu\n",
+            PANVKDBG_PRINT( "PANVKDBG COPY_RAW SRC=%016llx DST=%016llx bytes=%llu\n",
                     (unsigned long long)alias.vk.device_address,
                     (unsigned long long)panvk_buffer_gpu_ptr(dst, r->bufferOffset),
                     (unsigned long long)size);

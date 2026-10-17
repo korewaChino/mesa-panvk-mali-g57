@@ -460,6 +460,15 @@ debug_get_option_ ## sufix (void) \
    return value; \
 }
 
+/* Fork-local PanVK bring-up tracing ("PANVKDBG ..." lines), silent unless
+ * PANVK_VERBOSE is set. */
+DEBUG_GET_ONCE_BOOL_OPTION(panvkdbg, "PANVK_VERBOSE", false)
+#define PANVKDBG_PRINT(...)                                                    \
+   do {                                                                        \
+      if (unlikely(debug_get_option_panvkdbg()))                               \
+         fprintf(stderr, __VA_ARGS__);                                         \
+   } while (0)
+
 
 #ifdef __cplusplus
 }

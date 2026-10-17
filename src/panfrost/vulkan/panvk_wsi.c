@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include "util/u_debug.h"
 #include "panvk_wsi.h"
 #include "panvk_device_memory.h"
 #include "panvk_instance.h"
@@ -82,7 +83,7 @@ panvk_wsi_init(struct panvk_physical_device *physical_device)
 
             if (dup2(fileno(panvkdbg_file), STDERR_FILENO) >= 0) {
                setvbuf(stderr, NULL, _IOLBF, 0);
-               fprintf(stderr,
+               PANVKDBG_PRINT(
                        "PANVKDBG FILE_LOG path=%s pid=%ld\n",
                        panvkdbg_path, (long)getpid());
                fflush(stderr);
@@ -124,7 +125,7 @@ panvk_wsi_init(struct panvk_physical_device *physical_device)
    const bool ahb_wsi =
       uses_kbase && getenv("PANVK_AHB_WSI") != NULL;
 
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG WSI: uses_kbase=%d termux_raw=%d raw_dri3=%d "
            "kbase_dmabuf=%d sw_device=%d raw_fd_modifier=%d\n",
            uses_kbase,
@@ -154,7 +155,7 @@ panvk_wsi_init(struct panvk_physical_device *physical_device)
     */
    if (uses_kbase) {
       physical_device->wsi_device.has_import_memory_host = true;
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG WSI host-import diagnostic enabled\n");
    }
 

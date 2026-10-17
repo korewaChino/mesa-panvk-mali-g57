@@ -4,6 +4,7 @@
  */
 
 #include "genxml/decode.h"
+#include "util/u_debug.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -162,7 +163,7 @@ panvk_ahb_import_image(struct panvk_device *device, VkImage image,
    VK_FROM_HANDLE(panvk_image, pimage, image);
    uint32_t w = pimage->vk.extent.width;
    uint32_t h = pimage->vk.extent.height;
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG AHB_WSI entry fmt=%u %ux%ux%u mips=%u layers=%u\n",
            (unsigned)pimage->vk.format, w, h, pimage->vk.extent.depth,
            pimage->vk.mip_levels, pimage->vk.array_layers);
@@ -305,7 +306,7 @@ panvk_AllocateMemory(VkDevice _device,
                            IMPORT_MEMORY_HOST_POINTER_INFO_EXT);
 
    if (unlikely(getenv("PANVK_VERBOSE"))) {
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG ALLOC size=%llu type=%u host_import=%d host_ptr=%p\n",
               (unsigned long long)pAllocateInfo->allocationSize,
               pAllocateInfo->memoryTypeIndex,
@@ -353,7 +354,7 @@ panvk_AllocateMemory(VkDevice _device,
       }
 
       if (unlikely(getenv("PANVK_VERBOSE"))) {
-         fprintf(stderr,
+         PANVKDBG_PRINT(
                  "PANVKDBG HOST_IMPORT USER_BUFFER ptr=%p size=%llu\n",
                  host_ptr_info->pHostPointer,
                  (unsigned long long)pAllocateInfo->allocationSize);
@@ -514,6 +515,12 @@ panvk_AllocateMemory(VkDevice _device,
 
    p_atomic_add(&physical_device->memory.heap_used,
                 (uint64_t)pan_kmod_bo_size(mem->bo));
+
+   PANVKDBG_PRINT("PANVKDBG ALLOC_MEM size=%llu type=%u total=%llu\n",
+                  (unsigned long long)pan_kmod_bo_size(mem->bo),
+                  pAllocateInfo->memoryTypeIndex,
+                  (unsigned long long)p_atomic_read(
+                     &physical_device->memory.heap_used));
 
    *pMem = panvk_device_memory_to_handle(mem);
 
@@ -677,7 +684,7 @@ panvk_create_dma_buf_buffer_mem(VkDevice _device, uint32_t w, uint32_t h,
    memset(&out, 0, sizeof(out));
    fns.describe(ahb, &out);
    if ((uint64_t)out.stride * 4 != (uint64_t)row_pitch_bytes) {
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG AHB_WSI buffer: stride %u px != row %u B, fallback\n",
               out.stride, row_pitch_bytes);
       fns.release(ahb);
@@ -730,7 +737,7 @@ panvk_create_dma_buf_buffer_mem(VkDevice _device, uint32_t w, uint32_t h,
 
    VK_FROM_HANDLE(panvk_device_memory, mem, mem_handle);
    mem->ahb = ahb;
-   fprintf(stderr, "PANVKDBG AHB_WSI buffer imported %ux%u stride=%u fd=%d\n",
+   PANVKDBG_PRINT( "PANVKDBG AHB_WSI buffer imported %ux%u stride=%u fd=%d\n",
            w, h, out.stride, dmabuf);
    *out_mem = mem_handle;
    return VK_SUCCESS;

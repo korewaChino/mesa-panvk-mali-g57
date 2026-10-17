@@ -10,6 +10,7 @@
  */
 
 #include "genxml/gen_macros.h"
+#include "util/u_debug.h"
 
 #include "panvk_buffer.h"
 #include "panvk_cmd_alloc.h"
@@ -76,7 +77,7 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
    assert(batch);
 
    if (unlikely(getenv("PANVK_VERBOSE"))) {
-      fprintf(stderr, "PANVKDBG close_batch: fb=%llx vtc=%llx frag=%llx jobs=%u\n",
+      PANVKDBG_PRINT( "PANVKDBG close_batch: fb=%llx vtc=%llx frag=%llx jobs=%u\n",
               (unsigned long long)batch->fb.desc.gpu,
               (unsigned long long)batch->vtc_jc.first_job,
               (unsigned long long)batch->frag_jc.first_job,
@@ -214,40 +215,40 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
 
          if (unlikely(getenv("PANVK_VERBOSE"))) {
               const uint32_t *w = (const uint32_t *)fbd.cpu;
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG fbd l=%u w0=%08x w1=%08x w2=%08x w3=%08x "
                       "w4=%08x w5=%08x w6=%08x w7=%08x\n",
                       layer_id, w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG fbd w8=%08x w9=%08x w10=%08x w11=%08x "
                       "w12=%08x w13=%08x w14=%08x w15=%08x\n",
                       w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]);
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG fs modes=%u,%u,%u dcd=%llx\n",
                       fs.modes[0], fs.modes[1], fs.modes[2],
                       (unsigned long long)fs.dcd_pointer);
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG fb: w=%u h=%u tile=%u samps=%u rts=%u\n",
                       render->fb.layout.width_px, render->fb.layout.height_px,
                       render->fb.layout.tile_size_px,
                       render->fb.layout.sample_count, render->fb.layout.rt_count);
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG tls: gpu=%llx cpu=%p\n",
                       (unsigned long long)batch->tls.gpu, batch->tls.cpu);
               const uint32_t *rtw = (const uint32_t *)fb_descs.rts;
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG rt0 w0=%08x w1=%08x w2=%08x w3=%08x "
                       "w4=%08x w5=%08x w6=%08x w7=%08x\n",
                       rtw[0], rtw[1], rtw[2], rtw[3], rtw[4], rtw[5],
                       rtw[6], rtw[7]);
-              fprintf(stderr,
+              PANVKDBG_PRINT(
                       "PANVKDBG rt0 w8=%08x w9=%08x w10=%08x w11=%08x "
                       "w12=%08x w13=%08x w14=%08x w15=%08x\n",
                       rtw[8], rtw[9], rtw[10], rtw[11], rtw[12], rtw[13],
                       rtw[14], rtw[15]);
               const struct pan_fb_load *ld = fbd_info.load;
              for (unsigned rt = 0; rt < render->fb.layout.rt_count; rt++) {
-                fprintf(stderr,
+                PANVKDBG_PRINT(
                         "PANVKDBG load rt%u always=%d ib=%d bd=%d clr=%08x%08x\n",
                         rt, ld->rts[rt].always, ld->rts[rt].in_bounds_load,
                         ld->rts[rt].border_load,

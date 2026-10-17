@@ -404,7 +404,7 @@ panvk_image_get_mod(struct panvk_image *image,
       if (!(iusage.wsi && wsi_afbc && wsi_afbc[0] != '0' && ahb_wsi &&
             ahb_wsi[0] != '0')) {
          if (iusage.wsi) {
-            fprintf(stderr,
+            PANVKDBG_PRINT(
                     "PANVKDBG WSI/NO_AFBC image: forcing LINEAR modifier\n");
          }
          return DRM_FORMAT_MOD_LINEAR;
@@ -1381,7 +1381,7 @@ panvk_image_bind(struct panvk_device *dev,
 
    assert(mem);
 
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG IMAGE_BIND img=%p mem=%p memdev=%016llx offset=%016llx "
            "modifier=%016llx planes=%u format=%u usage=%016llx\n",
            (void *)image,
@@ -1410,7 +1410,7 @@ panvk_image_bind(struct panvk_device *dev,
       for (unsigned plane = 0; plane < image->plane_count; plane++) {
          panvk_image_plane_bind_mem(dev, &image->planes[plane], mem, offset);
 
-         fprintf(stderr,
+         PANVKDBG_PRINT(
                  "PANVKDBG IMAGE_PLANE img=%p plane=%u base=%016llx "
                  "mem_offset=%016llx\n",
                  (void *)image,

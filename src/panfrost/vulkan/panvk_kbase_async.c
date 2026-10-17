@@ -36,6 +36,7 @@
  */
 
 #include <errno.h>
+#include "util/u_debug.h"
 #include <poll.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -162,7 +163,7 @@ panvk_kbase_async_split_report(struct panvk_device *dev, const char *tag)
    double avg_wait_us = dev->async.split_submits ?
       (double)dev->async.split_wait_ns /
       (double)dev->async.split_submits / 1000.0 : 0.0;
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG split[%s]: busy=%.1f%% submits=%llu avg_cpu=%.1fus avg_semwait=%.1fus\n",
            tag, busy, (unsigned long long)dev->async.split_submits,
            avg_us, avg_wait_us);
@@ -179,7 +180,7 @@ panvk_kbase_async_fini(struct panvk_device *dev)
     * pending work is an app bug; block rather than leak. */
    panvk_kbase_async_drain(dev);
    if (dev->async.overlap && dev->async.dbg_submits)
-      fprintf(stderr, "PANVKDBG overlap stats: submits=%llu max_inflight=%u\n",
+      PANVKDBG_PRINT( "PANVKDBG overlap stats: submits=%llu max_inflight=%u\n",
               (unsigned long long)dev->async.dbg_submits,
               dev->async.dbg_max_inflight);
    if (dev->async.fence_stream >= 0) {

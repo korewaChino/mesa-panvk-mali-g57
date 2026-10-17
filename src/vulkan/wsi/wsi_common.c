@@ -1432,7 +1432,7 @@ wsi_CreateSwapchainKHR(VkDevice _device,
    ICD_FROM_HANDLE(VkIcdSurfaceBase, surface, pCreateInfo->surface);
    struct wsi_device *wsi_device = device->physical->wsi_device;
 
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG PRESENT CREATE_ENTER surface=%p format=%d "
            "extent=%ux%u minImages=%u mode=%d sw=%d\\n",
            (void *)(uintptr_t)pCreateInfo->surface,
@@ -2291,7 +2291,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
    VK_FROM_HANDLE(vk_device, device, _device);
 
    if (unlikely(getenv("PANVK_VERBOSE")))
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG PRESENT ACQUIRE_ENTER swapchain=%p timeout=%" PRIu64 "\n",
               (void *)swapchain, pAcquireInfo->timeout);
 
@@ -2299,7 +2299,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
                                                    pImageIndex);
 
    if (unlikely(getenv("PANVK_VERBOSE")))
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG PRESENT ACQUIRE_RET swapchain=%p result=%d index=%u\n",
               (void *)swapchain, result,
               (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) ?
@@ -2465,7 +2465,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
    struct vk_device *dev = queue->base.device;
 
    if (unlikely(getenv("PANVK_VERBOSE")))
-      fprintf(stderr,
+      PANVKDBG_PRINT(
               "PANVKDBG PRESENT QUEUE_ENTER queue=%p swapchainCount=%u waitCount=%u\n",
               (void *)queue,
               pPresentInfo->swapchainCount,
@@ -2928,7 +2928,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
          region = &regions->pRegions[i];
 
       if (unlikely(getenv("PANVK_VERBOSE")))
-         fprintf(stderr,
+         PANVKDBG_PRINT(
                  "PANVKDBG PRESENT BACKEND_ENTER i=%u swapchain=%p "
                  "image=%u present_id=%" PRIu64 "\n",
                  i, (void *)swapchain, image_index,
@@ -2939,7 +2939,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
                                             region);
 
       if (unlikely(getenv("PANVK_VERBOSE")))
-         fprintf(stderr,
+         PANVKDBG_PRINT(
                  "PANVKDBG PRESENT BACKEND_RET i=%u image=%u result=%d\n",
                  i, image_index, results[i]);
 
@@ -3196,7 +3196,7 @@ wsi_create_buffer_blit_context(const struct wsi_swapchain *chain,
    if (info->alloc_shm)
       sw_host_ptr = info->alloc_shm(image, info->linear_size);
 
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG WSI_BLIT_SHM alloc_shm=%p sw_host_ptr=%p "
            "size=%llu\n",
            (void *)info->alloc_shm,
@@ -3685,7 +3685,7 @@ wsi_configure_cpu_image(const struct wsi_swapchain *chain,
    assert(chain->blit.type == WSI_SWAPCHAIN_NO_BLIT ||
           chain->blit.type == WSI_SWAPCHAIN_BUFFER_BLIT);
 
-   fprintf(stderr,
+   PANVKDBG_PRINT(
            "PANVKDBG WSI_CPU_CONFIG blit=%d alloc_shm=%p "
            "has_import_host=%d wants_linear=%d\n",
            chain->blit.type,

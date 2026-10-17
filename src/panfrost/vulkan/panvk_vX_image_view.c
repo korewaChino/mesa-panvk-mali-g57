@@ -12,6 +12,7 @@
  */
 
 #include "vk_format.h"
+#include "util/u_debug.h"
 #include "vk_log.h"
 #include "vk_ycbcr_conversion.h"
 
@@ -179,7 +180,7 @@ prepare_tex_descs(struct panvk_image_view *view)
             pan_unpack(&view->descs.tex[0], TEXTURE, texture);
             pan_unpack((const struct mali_generic_plane_packed *)ptr.cpu,
                        GENERIC_PLANE, plane);
-            fprintf(stderr,
+            PANVKDBG_PRINT(
                     "PANVKDBG COPY_TEXTURE image=%p view=%p surfaces=%016llx "
                     "payload_gpu=%016llx SRC=%016llx size=%llu row_stride=%llu "
                     "mip=%u layer=%u\n",
