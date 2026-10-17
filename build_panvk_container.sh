@@ -26,6 +26,15 @@ fi
 
 SRC=/src
 BUILD=/src/_build/g57
+
+# Two ninja runs in one build dir corrupt each other (e.g. a host-side
+# `podman exec` that was killed leaves its build running in the container).
+mkdir -p /src/_build
+exec 9>/src/_build/.build.lock
+if ! flock -n 9; then
+   echo "another build is already running in $BUILD" >&2
+   exit 1
+fi
 export CCACHE_DIR=/src/_build/ccache
 export CC="ccache gcc" CXX="ccache g++"
 
