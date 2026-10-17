@@ -290,7 +290,7 @@ panvk_per_arch(cmd_alloc_fb_desc)(struct panvk_cmd_buffer *cmdbuf)
    fbd_size = ALIGN_POT(fbd_size, pan_alignment(RENDER_TARGET)) +
               (fb->rt_count * pan_size(RENDER_TARGET));
 
-#if PAN_ARCH < 9
+#if PAN_ARCH < 10
     batch->fb.bo_count = cmdbuf->state.gfx.render.fb.bo_count;
     memcpy(batch->fb.bos, cmdbuf->state.gfx.render.fb.bos,
            batch->fb.bo_count * sizeof(batch->fb.bos[0]));

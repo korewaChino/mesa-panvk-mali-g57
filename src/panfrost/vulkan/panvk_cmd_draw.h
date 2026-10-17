@@ -94,9 +94,12 @@ struct panvk_rendering_state {
       /* nr_samples to be used before framebuffer / tiler descriptor are emitted */
       uint32_t nr_samples;
 
-#if PAN_ARCH < 9
+#if PAN_ARCH < 10
+      /* JM kernels (panfrost.ko) need explicit BO lists for implicit sync. */
       uint32_t bo_count;
       struct pan_kmod_bo *bos[(MAX_RTS * PANVK_MAX_PLANES) + 2];
+#endif
+#if PAN_ARCH < 9
       bool needs_load;
       bool needs_store;
 #endif
