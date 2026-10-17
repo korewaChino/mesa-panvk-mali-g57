@@ -28,51 +28,6 @@
 #include "vk_framebuffer.h"
 
 #include "drm-uapi/panfrost_drm.h"
-#include "drm-uapi/mali_kbase_ioctl.h"
-#include <poll.h>
-#include <sys/ioctl.h>
-#include <sys/ioctl.h>
-
-struct panvk_kbase_event_v2 {
-   uint32_t event_code;
-   uint8_t atom_number;
-   uint8_t padding[3];
-   uint64_t udata[2];
-};
-
-static int
-panvk_kbase_submit_and_wait(int fd, uint64_t jc, uint32_t core_req)
-{
-   uint8_t atom_bytes[48];
-   memset(atom_bytes, 0, sizeof(atom_bytes));
-   memcpy(atom_bytes + 0, &jc, 8);
-   atom_bytes[40] = 1;
-   memcpy(atom_bytes + 44, &core_req, 4);
-
-   struct kbase_ioctl_job_submit submit = {
-      .addr = (uint64_t)(uintptr_t)atom_bytes,
-      .nr_atoms = 1,
-      .stride = 48,
-   };
-
-   if (ioctl(fd, KBASE_IOCTL_JOB_SUBMIT, &submit))
-      return -errno;
-
-   struct pollfd pfd = { .fd = fd, .events = POLLIN };
-   int pret = poll(&pfd, 1, 5000);
-   if (pret <= 0 || !(pfd.revents & POLLIN))
-      return -110;
-
-   struct panvk_kbase_event_v2 event;
-   ssize_t n = read(fd, &event, sizeof(event));
-   if (n != sizeof(event))
-      return -5;
-
-   if (event.event_code != 0x1)
-      return -(int)event.event_code;
-
-   return 0;
-}
 
 #ifdef HAVE_PAN_KMOD_KBASE
 /* kbase JM submit path, defined in panvk_vX_gpu_queue_kbase.c (a separate TU
@@ -122,30 +77,82 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
 
    if (batch->vtc_jc.first_job) {
-      ret = panvk_kbase_submit_and_wait(dev->drm_fd, batch->vtc_jc.first_job, 0x16) /* PATCH: T|CS|V combined, vtc_jc may contain mixed job types */;
+      struct drm_panfrost_submit submit = {
+         .bo_handles = (uintptr_t)bos,
+         .bo_handle_count = nr_bos,
+         .in_syncs = (uintptr_t)in_fences,
+         .in_sync_count = nr_in_fences,
+         .out_sync = queue->sync,
+         .jc = batch->vtc_jc.first_job,
+      };
+
+      ret = pan_kmod_ioctl(dev->drm_fd, DRM_IOCTL_PANFROST_SUBMIT, &submit);
       assert(!ret);
 
-      if (PANVK_DEBUG(TRACE)) {
+      if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
+         ret = drmSyncobjWait(dev->drm_fd, &submit.out_sync, 1, INT64_MAX, 0,
+                              NULL);
+         assert(!ret);
+
+         /* If we want to read the descriptors back, we need to invalidate the
+          * whole desc pool, otherwise we might end up with stale data. */
          panvk_pool_invalidate_maps(&cmdbuf->desc_pool);
+         pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+      }
+
+      if (PANVK_DEBUG(TRACE)) {
          pandecode_jc(dev->debug.decode_ctx, batch->vtc_jc.first_job,
                       phys_dev->kmod.dev->props.gpu_id);
       }
 
       if (PANVK_DEBUG(DUMP))
          pandecode_dump_mappings(dev->debug.decode_ctx);
+
+      if (PANVK_DEBUG(SYNC))
+         pandecode_abort_on_fault(dev->debug.decode_ctx, submit.jc,
+                                  phys_dev->kmod.dev->props.gpu_id);
    }
 
    if (batch->frag_jc.first_job) {
-      ret = panvk_kbase_submit_and_wait(dev->drm_fd, batch->frag_jc.first_job, 0x01);
+      struct drm_panfrost_submit submit = {
+         .bo_handles = (uintptr_t)bos,
+         .bo_handle_count = nr_bos,
+         .out_sync = queue->sync,
+         .jc = batch->frag_jc.first_job,
+         .requirements = PANFROST_JD_REQ_FS,
+      };
+
+      if (batch->vtc_jc.first_job) {
+         submit.in_syncs = (uintptr_t)(&queue->sync);
+         submit.in_sync_count = 1;
+      } else {
+         submit.in_syncs = (uintptr_t)in_fences;
+         submit.in_sync_count = nr_in_fences;
+      }
+
+      ret = pan_kmod_ioctl(dev->drm_fd, DRM_IOCTL_PANFROST_SUBMIT, &submit);
       assert(!ret);
-      if (PANVK_DEBUG(TRACE)) {
+      if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
+         ret = drmSyncobjWait(dev->drm_fd, &submit.out_sync, 1, INT64_MAX, 0,
+                              NULL);
+         assert(!ret);
+
+         /* If we want to read the descriptors back, we need to invalidate the
+          * whole desc pool, otherwise we might end up with stale data. */
          panvk_pool_invalidate_maps(&cmdbuf->desc_pool);
+         pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+      }
+
+      if (PANVK_DEBUG(TRACE))
          pandecode_jc(dev->debug.decode_ctx, batch->frag_jc.first_job,
                       phys_dev->kmod.dev->props.gpu_id);
-      }
 
       if (PANVK_DEBUG(DUMP))
          pandecode_dump_mappings(dev->debug.decode_ctx);
+
+      if (PANVK_DEBUG(SYNC))
+         pandecode_abort_on_fault(dev->debug.decode_ctx, submit.jc,
+                                  phys_dev->kmod.dev->props.gpu_id);
    }
 
    if (PANVK_DEBUG(TRACE))
@@ -249,12 +256,10 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
 
 #ifdef HAVE_PAN_KMOD_KBASE
    const bool is_kbase = to_panvk_physical_device(dev->vk.physical)->kbase_node_path[0] != '\0';
-#else
-   const bool is_kbase = false;
-#endif
 
    if (is_kbase && !getenv("PANVK_FORCE_ALT_SUBMIT"))
       return panvk_per_arch(kbase_jm_submit)(vk_queue, queue, dev, submit);
+#endif
 
    mesa_logd("panvk: gpu_queue_submit start, cmd_count=%u", submit->command_buffer_count);
 
