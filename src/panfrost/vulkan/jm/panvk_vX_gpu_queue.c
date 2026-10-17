@@ -447,5 +447,14 @@ panvk_per_arch(QueueWaitIdle)(VkQueue _queue)
    if (wres != VK_SUCCESS)
       return wres;
 
+   /* DRM (panfrost.ko): queue->sync carries the last submitted job's fence.
+    * It is 0 on kbase, where submission is synchronous. */
+   if (queue->sync) {
+      ASSERTED int ret = drmSyncobjWait(dev->drm_fd, &queue->sync, 1,
+                                        INT64_MAX,
+                                        DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL, NULL);
+      assert(!ret);
+   }
+
    return VK_SUCCESS;
 }
