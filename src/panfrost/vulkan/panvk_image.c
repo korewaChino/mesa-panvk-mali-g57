@@ -34,15 +34,6 @@
 #include "vk_object.h"
 #include "vk_util.h"
 
-/* AFBC on Valhall v9 JM corrupts partial image updates (e.g. RetroArch's
- * font atlas loses glyphs on panfrost.ko). Keep it off unless
- * PANVK_V9_AFBC=1 until the v9 AFBC load/store paths are fixed. */
-static bool
-panvk_afbc_disabled_on_arch(unsigned arch)
-{
-   return arch == 9 && !debug_get_bool_option("PANVK_V9_AFBC", false);
-}
-
 bool
 panvk_image_can_use_afbc(
    struct panvk_physical_device *phys_dev, VkFormat fmt,
@@ -71,7 +62,7 @@ panvk_image_can_use_afbc(
     * GetPhysicalDeviceImageFormatProperties2() and we don't have enough
     * information to conduct a full image property check in this context.
     */
-   return !PANVK_DEBUG(NO_AFBC) && !panvk_afbc_disabled_on_arch(arch) &&
+   return !PANVK_DEBUG(NO_AFBC) &&
           !(usage &
             (VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT)) &&
           pan_query_afbc(&phys_dev->kmod.dev->props) &&
@@ -227,7 +218,7 @@ panvk_image_can_use_mod(struct panvk_image *image,
 
    if (drm_is_afbc(mod)) {
       /* AFBC explicitly disabled. */
-      if (PANVK_DEBUG(NO_AFBC) || panvk_afbc_disabled_on_arch(arch))
+      if (PANVK_DEBUG(NO_AFBC))
          return false;
 
       /* Can't do AFBC if store/host copy is requested. */

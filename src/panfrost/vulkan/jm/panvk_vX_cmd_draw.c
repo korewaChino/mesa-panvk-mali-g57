@@ -2383,6 +2383,10 @@ panvk_v9_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
 
    const bool writes_point_size =
       vs->info.vs.writes_point_size && is_points;
+   /* The VS stores gl_Layer in the attribute part of the position FIFO entry.
+    * Unless the tiler is told to expect it, that entry isn't reserved and the
+    * store lands on a neighbouring vertex position. */
+   const bool writes_layer = vs->info.outputs_written & VARYING_BIT_LAYER;
    const uint8_t index_size = info->index.index_size;
 
    float minz, maxz;
@@ -2414,6 +2418,7 @@ panvk_v9_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          if (writes_point_size)
             cfg.point_size_array_format = MALI_POINT_SIZE_ARRAY_FORMAT_FP16;
 
+         cfg.layer_index_enable = writes_layer;
          cfg.secondary_shader = has_varying;
          cfg.primitive_restart = info->index.restart_enable;
 
