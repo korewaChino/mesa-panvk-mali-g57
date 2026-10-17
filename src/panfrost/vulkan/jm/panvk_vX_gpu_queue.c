@@ -53,8 +53,34 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
 
    /* Reset the batch if it's already been issued */
    if (batch->issued) {
-      util_dynarray_foreach(&batch->jobs, void *, job)
-         memset((*job), 0, 4 * 4);
+#if PAN_ARCH >= 9
+      /* We read back job types below, which the GPU may have touched. */
+      panvk_pool_invalidate_maps(&cmdbuf->desc_pool);
+      pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+#endif
+
+      util_dynarray_foreach(&batch->jobs, void *, job) {
+         uint32_t *j = *job;
+#if PAN_ARCH >= 9
+         /* Grab the job type before clearing the GPU-written status. */
+         uint8_t job_type = (j[4] >> 1) & 0x7f;
+#endif
+
+         memset(j, 0, 4 * 4);
+
+#if PAN_ARCH >= 9
+         /* MALLOC_VERTEX jobs write their Draw.Vertex array (words 34..36)
+          * during execution: the pointer and strides are outputs. Restore the
+          * pristine input state (only Packet=true), or re-issuing the batch
+          * fails with DATA_INVALID_FAULT. */
+         if (job_type == MALI_JOB_TYPE_MALLOC_VERTEX) {
+            pan_pack((struct mali_vertex_array_packed *)&j[34], VERTEX_ARRAY,
+                     cfg) {
+               cfg.packet = true;
+            }
+         }
+#endif
+      }
 
       /* Reset the tiler before re-issuing the batch */
       if (batch->tiler.ctx_descs.cpu) {
