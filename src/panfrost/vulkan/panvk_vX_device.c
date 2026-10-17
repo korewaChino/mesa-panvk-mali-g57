@@ -633,9 +633,16 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
       if (e && atoi(e) >= 16 && atoi(e) <= 2048)
          tiler_heap_mb = (uint64_t)atoi(e);
    }
+   /* panfrost.ko refuses to mmap growable (heap) BOs since their pages are
+    * not pinned. Only the kbase backend peeks at the heap from the CPU. */
+   uint32_t tiler_heap_flags =
+      PAN_KMOD_BO_FLAG_NO_MMAP | PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT;
+#ifdef HAVE_PAN_KMOD_KBASE
+   if (physical_device->kbase_node_path[0])
+      tiler_heap_flags = PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT;
+#endif
    result = panvk_priv_bo_create(
-      device, tiler_heap_mb * 1024 * 1024,
-      PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT,
+      device, tiler_heap_mb * 1024 * 1024, tiler_heap_flags,
       VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->tiler_heap);
    if (result != VK_SUCCESS)
       goto err_free_priv_bos;
