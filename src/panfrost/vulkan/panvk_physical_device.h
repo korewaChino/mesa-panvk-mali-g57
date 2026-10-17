@@ -100,12 +100,13 @@ VkResult panvk_physical_device_init(struct panvk_physical_device *device,
                                     struct panvk_instance *instance,
                                     drmDevicePtr drm_device);
 
+/* Also referenced by the always-built panvk_kbase_async.c prototypes. */
+#define PANVK_KBASE_SYNC_TARGET_COUNT 3
+
 #if defined(HAVE_PAN_KMOD_KBASE)
 VkResult panvk_physical_device_init_kbase(struct panvk_physical_device *device,
                                           struct panvk_instance *instance,
                                           const char *path);
-
-#define PANVK_KBASE_SYNC_TARGET_COUNT 3
 
 typedef VkResult (*panvk_kbase_sync_wait_func)(
    void *data,

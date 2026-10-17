@@ -630,6 +630,10 @@ panvk_create_dma_buf_buffer_mem(VkDevice _device, uint32_t w, uint32_t h,
    if (!physical_device->kbase_node_path[0] || !getenv("PANVK_AHB_WSI"))
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
+#ifndef __ANDROID__
+   /* AHB import is Android-only. */
+   return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+#else
    /* 4 bytes/pixel only (row math below assumes it). */
    switch (format) {
    case VK_FORMAT_R8G8B8A8_UNORM:
@@ -730,6 +734,7 @@ panvk_create_dma_buf_buffer_mem(VkDevice _device, uint32_t w, uint32_t h,
            w, h, out.stride, dmabuf);
    *out_mem = mem_handle;
    return VK_SUCCESS;
+#endif /* __ANDROID__ */
 }
 
 
