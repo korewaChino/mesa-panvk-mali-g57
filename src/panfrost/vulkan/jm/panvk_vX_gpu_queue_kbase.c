@@ -319,11 +319,7 @@ panvk_kbase_jm_prepare_batch(struct panvk_gpu_queue *queue,
          memcpy(batch->tiler.heap_desc.cpu, &batch->tiler.heap_templ,
                 sizeof(batch->tiler.heap_templ));
 
-         struct mali_tiler_context_packed *ctxs =
-            batch->tiler.ctx_descs.cpu;
-
-         for (uint32_t i = 0; i < batch->fb.layer_count; i++)
-            memcpy(&ctxs[i], &batch->tiler.ctx_templ, sizeof(*ctxs));
+         panvk_batch_init_tiler_ctxs(batch, batch->fb.layer_count);
       }
 
       panvk_pool_flush_maps(&cmdbuf->desc_pool);

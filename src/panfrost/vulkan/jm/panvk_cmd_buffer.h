@@ -56,6 +56,12 @@ struct panvk_batch {
       struct pan_ptr ctx_descs;
       struct mali_tiler_heap_packed heap_templ;
       struct mali_tiler_context_packed ctx_templ;
+#if PAN_ARCH >= 9
+      /* Bias each per-layer tiler context by -layer, so it only collects
+       * primitives whose gl_Layer matches. False for multiview, where the
+       * draw is replicated per view and nothing writes gl_Layer. */
+      bool layer_offsets;
+#endif
    } tiler;
    struct pan_tls_info tlsinfo;
    unsigned wls_total_size;
@@ -65,6 +71,30 @@ struct panvk_batch {
     * on the fragment job that used the same half. */
    unsigned heap_half;
 };
+
+/* (Re)initialize the per-layer tiler contexts of a batch from its template.
+ *
+ * JM emits one tiler context per layer, each describing a single layer. On
+ * Valhall, the tiler adds the context's layer offset to the primitive layer
+ * to pick a layer slot inside the context, and the FBD selects the slot with
+ * internal_layer_index. Biasing context N by -N keeps both at slot 0. */
+static inline void
+panvk_batch_init_tiler_ctxs(struct panvk_batch *batch, uint32_t layer_count)
+{
+   struct mali_tiler_context_packed *ctxs = batch->tiler.ctx_descs.cpu;
+
+   for (uint32_t i = 0; i < layer_count; i++) {
+      memcpy(&ctxs[i], &batch->tiler.ctx_templ, sizeof(*ctxs));
+
+#if PAN_ARCH >= 9
+      if (batch->tiler.layer_offsets) {
+         /* Word 4: layer count - 1 in bits 0..7, signed 9-bit layer offset
+          * in bits 8..16. The template leaves the offset at zero. */
+         ctxs[i].opaque[4] |= ((uint32_t)-(int32_t)i & BITFIELD_MASK(9)) << 8;
+      }
+#endif
+   }
+}
 
 enum panvk_cmd_event_op_type {
    PANVK_EVENT_OP_SET,

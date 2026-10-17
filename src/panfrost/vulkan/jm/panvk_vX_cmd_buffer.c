@@ -389,21 +389,23 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
    memcpy(batch->tiler.heap_desc.cpu, &batch->tiler.heap_templ,
           sizeof(batch->tiler.heap_templ));
 
-   struct mali_tiler_context_packed *ctxs = batch->tiler.ctx_descs.cpu;
-
+   STATIC_ASSERT(
+      !(pan_size(TILER_CONTEXT) & (pan_alignment(TILER_CONTEXT) - 1)));
    assert(layer_count > 0);
-   for (uint32_t i = 0; i < layer_count; i++) {
-      STATIC_ASSERT(
-         !(pan_size(TILER_CONTEXT) & (pan_alignment(TILER_CONTEXT) - 1)));
-
-      memcpy(&ctxs[i], &batch->tiler.ctx_templ, sizeof(*ctxs));
-   }
+#if PAN_ARCH >= 9
+   assert(layer_count <= 256);
+   batch->tiler.layer_offsets = cmdbuf->state.gfx.render.view_mask == 0;
+#endif
+   panvk_batch_init_tiler_ctxs(batch, layer_count);
 
 out_set_layer_ctx:
-   if (PAN_ARCH >= 9)
-      batch->tiler.ctx.valhall.desc = tiler_desc;
-   else
-      batch->tiler.ctx.bifrost.desc = tiler_desc;
+#if PAN_ARCH >= 9
+   batch->tiler.ctx.valhall.desc = tiler_desc;
+   /* Each context holds a single layer, so the FBD must select slot 0. */
+   batch->tiler.ctx.valhall.layer_offset = layer_idx;
+#else
+   batch->tiler.ctx.bifrost.desc = tiler_desc;
+#endif
 
    return VK_SUCCESS;
 }
