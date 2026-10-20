@@ -8,7 +8,7 @@ A Mesa snapshot (26.3-devel) carrying experimental PanVK (Vulkan) support for **
 GPUs (Mali-G57). It is imported from `apexspan-svg/mesa-panvk-mali-g57` (release v1.3.0), which
 targeted Arm's `kbase` driver on Android/Termux. There is no upstream git ancestry. The snapshot
 corresponds most closely to upstream Mesa `84f090168c` (2026-07-27). Diff against that commit to
-isolate fork changes. An upstream Mesa checkout lives at `../mesa` (blobless clone of main since
+isolate fork changes. An upstream Mesa checkout lives in `mesa-upstream/` inside this repo (git-ignored via `.git/info/exclude`; blobless clone of main since
 2026-05, with this repo added as remote `g57`).
 
 **Current goal (branch `g57-panfrost-kmd`):** run PanVK on the **mainline `panfrost.ko` DRM
@@ -30,12 +30,21 @@ container matches the device's libraries.
 
 The script creates or starts the `panvk-build` podman container, with the repo mounted at
 `/src`. It uses the `localhost/panvk-build:f44` image with deps preinstalled if that exists,
-and otherwise runs `dnf builddep mesa`. Inside the container it configures Vulkan-only
-(`-Dvulkan-drivers=panfrost -Dgallium-drivers=`) with `-Dpanfrost-kmds=panfrost,panthor` (panthor is needed to link the v10+ CSF arches) and
-`--prefix=/usr`, then builds. Keep LLVM enabled, because panfrost's precompiled CL kernels need
-`mesa_clc`. Rerunning the script rebuilds incrementally. Build tree, ccache and install output
-all live in `_build/`, which is git-ignored through `.git/info/exclude`. The older
-`build_panvk.sh` / `BUILDING.md` describe the fork's Termux/kbase build.
+and otherwise runs `dnf builddep mesa`. Inside the container it builds the **full Mesa
+userspace** into `_build/mesa` with `--prefix=/usr`: Gallium `panfrost,llvmpipe,softpipe,zink`
+(GL, GLES2+, glvnd EGL/GLX vendor libs, GBM, DRI loader) plus PanVK, with
+`-Dpanfrost-kmds=panfrost,panthor` (panthor is needed to link the v10+ CSF arches). llvmpipe and
+zink are there so Fedora's `swrast`/`kms_swrast`/`zink` symlinks into our `libdril_dri.so` keep
+working. Keep LLVM enabled, because panfrost's precompiled CL kernels need `mesa_clc`.
+
+- Run it with the Bash tool's `run_in_background` and no log redirect.
+- `ninja` runs with `-j ${PANVK_JOBS:-6}`. The default (nproc+2) ran the 23 GiB host out of RAM on
+  emulated C++ compiles.
+- A lock file stops a second build from sharing the build dir. A killed host-side `podman exec`
+  leaves its build running in the container, so check for one before retrying.
+- Rerunning the script rebuilds incrementally. Build tree, ccache and install output all live in
+  `_build/`, which is git-ignored through `.git/info/exclude`. The older `build_panvk.sh` /
+  `BUILDING.md` describe the fork's Termux/kbase build.
 
 KMD selection:
 - `-Dpanfrost-kmds` takes any of `panfrost,panthor,kbase`. Each one defines `HAVE_PAN_KMOD_<NAME>`.
@@ -45,18 +54,21 @@ KMD selection:
 
 ## Deploy / test on the device
 
-- Device: `ssh ultramarine@192.168.1.19`. Sudo needs a password, so Claude can't run root
-  commands there.
-- Quick iteration without root: copy `_build/install/usr` to the device home directory. Then
-  run with `VK_DRIVER_FILES=<path>/share/vulkan/icd.d/panfrost_icd.aarch64.json`, after fixing
-  `library_path` in that JSON to an absolute path.
-- Proper install is a **systemd-sysext** (`/usr` is read-only). Build an erofs image of the
-  install tree. It needs `usr/lib/extension-release.d/extension-release.panvk` containing
-  `ID=ultramarine` and `VERSION_ID=44`. Put it in `/var/lib/extensions/panvk.raw` and activate
-  with `systemd-sysext refresh`. The user runs the root steps. An existing `marina` sysext is
-  already merged; don't touch it.
-- The device's GL comes from the distro (`mesa-dri-drivers` 26.2). This tree ships only
-  `libvulkan_panfrost.so` and its ICD.
+- Device: `ssh ultramarine@192.168.1.19`. `sudo` needs a password, but `ssh root@192.168.1.19`
+  works with key auth for root steps (sysext install, `dmesg`).
+- `./deploy_panvk.sh [--install]` copies `_build/install/usr` to `~/panvk/usr` for root-less Vulkan
+  tests (`VK_DRIVER_FILES=~/panvk/panfrost_icd.json`). It also builds a stripped erofs
+  **systemd-sysext**, `_build/panvk.raw`, with `extension-release.panvk` matching the device's
+  `ID`/`VERSION_ID`. `--install` puts it in `/var/lib/extensions/panvk.raw` over root SSH and runs
+  `systemd-sysext refresh`. An existing `marina` sysext is also merged; don't touch it.
+- The sysext **replaces the distro Mesa stack** (Fedora `mesa-dri-drivers`/`libEGL`/`libGL`/`libgbm`
+  26.2), including the EGL/GBM that sway uses. Processes started before a refresh keep the old
+  libraries mapped. Roll back with `rm /var/lib/extensions/panvk.raw && systemd-sysext refresh`.
+- Display is the vendor `sunxi-drm` driver (card0); panfrost is the render node. Mesa has no
+  kmsro entry for `sunxi-drm`, so compositors render through `renderD128`.
+- On-device processes that must outlive an SSH command (RetroArch, etc.) run via
+  `systemd-run --user` and are read with `journalctl --user -u <unit>`. Never use `setsid`/`nohup`
+  with a log file, and stop processes by exact PID or unit, never by pattern.
 - PanVK refuses v6/v7/v14 unless `PAN_I_WANT_A_BROKEN_VULKAN_DRIVER=1` is set. v9 is allowed.
 
 ## Architecture notes (JM path)
