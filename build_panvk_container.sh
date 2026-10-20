@@ -1,5 +1,8 @@
 #!/bin/bash
-# Build PanVK for panfrost.ko (no kbase) in an emulated arm64 Fedora 44 container.
+# Build the full Mesa userspace for panfrost.ko (no kbase) in an emulated arm64
+# Fedora 44 container: Gallium panfrost GL/GLES + PanVK, with EGL/GLX (glvnd
+# vendor libs), GBM and the DRI loader laid out like Fedora's mesa packages,
+# so the sysext replaces the distro Mesa stack wholesale.
 #
 # Host:      ./build_panvk_container.sh          (starts the container if needed)
 # Output:    _build/install/usr                  (prefix /usr, ready for a sysext)
@@ -21,11 +24,11 @@ if [ ! -f /run/.containerenv ]; then
       fi
    fi
    podman start "$NAME" >/dev/null
-   exec podman exec "$NAME" /src/build_panvk_container.sh "$@"
+   exec podman exec -e PANVK_JOBS="${PANVK_JOBS:-}" "$NAME" /src/build_panvk_container.sh "$@"
 fi
 
 SRC=/src
-BUILD=/src/_build/g57
+BUILD=/src/_build/mesa
 
 # Two ninja runs in one build dir corrupt each other (e.g. a host-side
 # `podman exec` that was killed leaves its build running in the container).
@@ -39,22 +42,29 @@ export CCACHE_DIR=/src/_build/ccache
 export CC="ccache gcc" CXX="ccache g++"
 
 if [ ! -f "$BUILD/build.ninja" ]; then
+   # llvmpipe/softpipe and zink keep Fedora's swrast, kms_swrast and zink
+   # entry points working, since they all go through our libdril/libgallium.
    meson setup "$BUILD" "$SRC" \
       --prefix=/usr \
       --libdir=lib64 \
+      --sysconfdir=/etc \
       -Dbuildtype=debugoptimized \
       -Dplatforms=x11,wayland \
+      -Dgallium-drivers=panfrost,llvmpipe,softpipe,zink \
       -Dvulkan-drivers=panfrost \
-      -Dgallium-drivers= \
       -Dpanfrost-kmds=panfrost,panthor \
-      -Dglx=disabled -Degl=disabled -Dgles1=disabled -Dgles2=disabled \
-      -Dopengl=false -Dgbm=disabled \
+      -Dllvm=enabled -Dshared-llvm=enabled \
+      -Dglvnd=enabled -Dglx=dri -Degl=enabled -Dgbm=enabled \
+      -Dopengl=true -Dgles1=disabled -Dgles2=enabled \
+      -Dgallium-va=disabled \
       -Dvideo-codecs= \
       -Dvulkan-layers= -Dtools= \
       -Dbuild-tests=false
 fi
 
-ninja -C "$BUILD"
+# Emulated C++ compiles (llvmpipe, zink) are memory-hungry: ninja's default
+# of nproc+2 jobs ran a 23 GiB host out of RAM.
+ninja -C "$BUILD" -j "${PANVK_JOBS:-6}"
 rm -rf /src/_build/install
 DESTDIR=/src/_build/install ninja -C "$BUILD" install >/dev/null
 echo "Installed to _build/install/usr"
